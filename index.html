@@ -703,7 +703,7 @@ body::after{
   document.head.appendChild(st);
 })();
 async function rastrearIP() {
-  const ip = document.getElementById('ipInput').value.trim();
+  const ip  = document.getElementById('ipInput').value.trim();
   const btn = document.getElementById('ipBtn');
   const err = document.getElementById('ipErr');
   const res = document.getElementById('ipResult');
@@ -714,30 +714,41 @@ async function rastrearIP() {
   err.textContent = ''; res.style.display = 'none';
 
   try {
-    const r = await fetch(`https://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,proxy,hosting,query&lang=es`);
+    // ipinfo.io — HTTPS, gratis hasta 50k/mes, sin API key requerida
+    const r = await fetch(`https://ipinfo.io/${ip}/json`);
     const d = await r.json();
 
-    if (d.status !== 'success') {
-      err.textContent = 'IP no encontrada: ' + (d.message || 'error');
+    if (d.error || !d.ip) {
+      err.textContent = 'IP no encontrada: ' + (d.error?.message || 'sin datos');
       err.className = 'add-msg err';
-    } else {
-      ipData = d;
-      document.getElementById('ir_ip').textContent     = d.query;
-      document.getElementById('ir_pais').textContent   = d.country + ' (' + d.countryCode + ')';
-      document.getElementById('ir_ciudad').textContent = d.city + ', ' + d.regionName + (d.zip ? ' ' + d.zip : '');
-      document.getElementById('ir_isp').textContent    = d.isp + (d.org && d.org !== d.isp ? ' / ' + d.org : '');
-      document.getElementById('ir_coords').textContent = d.lat.toFixed(6) + ', ' + d.lon.toFixed(6);
-      document.getElementById('ir_tz').textContent     = d.timezone;
-      const tipo = [];
-      if (d.proxy)   tipo.push('PROXY');
-      if (d.hosting) tipo.push('HOSTING/VPN');
-      if (!d.proxy && !d.hosting) tipo.push('RESIDENCIAL');
-      document.getElementById('ir_tipo').textContent   = tipo.join(' · ');
-      res.style.display = 'block';
-      showToast('<i class="fa fa-wifi"></i> IP localizada: ' + d.city + ', ' + d.country);
+      return;
     }
-  } catch {
-    err.textContent = 'Error de conexión. Intenta con otra IP.';
+
+    // ipinfo devuelve "lat,lon" como string en d.loc
+    const [lat, lon] = (d.loc || '0,0').split(',').map(Number);
+
+    ipData = {
+      query:      d.ip,
+      country:    d.country || '—',
+      countryCode:d.country || '—',
+      regionName: d.region  || '—',
+      city:       d.city    || '—',
+      isp:        d.org     || '—',
+      timezone:   d.timezone|| '—',
+      lat, lon
+    };
+
+    document.getElementById('ir_ip').textContent     = d.ip;
+    document.getElementById('ir_pais').textContent   = (d.country || '—') + (d.region ? ' · ' + d.region : '');
+    document.getElementById('ir_ciudad').textContent = (d.city || '—') + (d.postal ? ' ' + d.postal : '');
+    document.getElementById('ir_isp').textContent    = d.org || '—';
+    document.getElementById('ir_coords').textContent = lat.toFixed(6) + ', ' + lon.toFixed(6);
+    document.getElementById('ir_tz').textContent     = d.timezone || '—';
+    document.getElementById('ir_tipo').textContent   = d.hostname ? 'SERVIDOR / HOSTING' : 'RESIDENCIAL / MÓVIL';
+    res.style.display = 'block';
+    showToast('<i class="fa fa-wifi"></i> IP localizada: ' + d.city + ', ' + d.country);
+  } catch(e) {
+    err.textContent = 'Error de conexión: ' + e.message;
     err.className = 'add-msg err';
   } finally {
     btn.innerHTML = '<i class="fa fa-search"></i> RASTREAR';
@@ -1513,7 +1524,7 @@ function formatDate(str) {
   } catch { return str; }
 }
 async function rastrearIP() {
-  const ip = document.getElementById('ipInput').value.trim();
+  const ip  = document.getElementById('ipInput').value.trim();
   const btn = document.getElementById('ipBtn');
   const err = document.getElementById('ipErr');
   const res = document.getElementById('ipResult');
@@ -1524,30 +1535,41 @@ async function rastrearIP() {
   err.textContent = ''; res.style.display = 'none';
 
   try {
-    const r = await fetch(`https://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,proxy,hosting,query&lang=es`);
+    // ipinfo.io — HTTPS, gratis hasta 50k/mes, sin API key requerida
+    const r = await fetch(`https://ipinfo.io/${ip}/json`);
     const d = await r.json();
 
-    if (d.status !== 'success') {
-      err.textContent = 'IP no encontrada: ' + (d.message || 'error');
+    if (d.error || !d.ip) {
+      err.textContent = 'IP no encontrada: ' + (d.error?.message || 'sin datos');
       err.className = 'add-msg err';
-    } else {
-      ipData = d;
-      document.getElementById('ir_ip').textContent     = d.query;
-      document.getElementById('ir_pais').textContent   = d.country + ' (' + d.countryCode + ')';
-      document.getElementById('ir_ciudad').textContent = d.city + ', ' + d.regionName + (d.zip ? ' ' + d.zip : '');
-      document.getElementById('ir_isp').textContent    = d.isp + (d.org && d.org !== d.isp ? ' / ' + d.org : '');
-      document.getElementById('ir_coords').textContent = d.lat.toFixed(6) + ', ' + d.lon.toFixed(6);
-      document.getElementById('ir_tz').textContent     = d.timezone;
-      const tipo = [];
-      if (d.proxy)   tipo.push('PROXY');
-      if (d.hosting) tipo.push('HOSTING/VPN');
-      if (!d.proxy && !d.hosting) tipo.push('RESIDENCIAL');
-      document.getElementById('ir_tipo').textContent   = tipo.join(' · ');
-      res.style.display = 'block';
-      showToast('<i class="fa fa-wifi"></i> IP localizada: ' + d.city + ', ' + d.country);
+      return;
     }
-  } catch {
-    err.textContent = 'Error de conexión. Intenta con otra IP.';
+
+    // ipinfo devuelve "lat,lon" como string en d.loc
+    const [lat, lon] = (d.loc || '0,0').split(',').map(Number);
+
+    ipData = {
+      query:      d.ip,
+      country:    d.country || '—',
+      countryCode:d.country || '—',
+      regionName: d.region  || '—',
+      city:       d.city    || '—',
+      isp:        d.org     || '—',
+      timezone:   d.timezone|| '—',
+      lat, lon
+    };
+
+    document.getElementById('ir_ip').textContent     = d.ip;
+    document.getElementById('ir_pais').textContent   = (d.country || '—') + (d.region ? ' · ' + d.region : '');
+    document.getElementById('ir_ciudad').textContent = (d.city || '—') + (d.postal ? ' ' + d.postal : '');
+    document.getElementById('ir_isp').textContent    = d.org || '—';
+    document.getElementById('ir_coords').textContent = lat.toFixed(6) + ', ' + lon.toFixed(6);
+    document.getElementById('ir_tz').textContent     = d.timezone || '—';
+    document.getElementById('ir_tipo').textContent   = d.hostname ? 'SERVIDOR / HOSTING' : 'RESIDENCIAL / MÓVIL';
+    res.style.display = 'block';
+    showToast('<i class="fa fa-wifi"></i> IP localizada: ' + d.city + ', ' + d.country);
+  } catch(e) {
+    err.textContent = 'Error de conexión: ' + e.message;
     err.className = 'add-msg err';
   } finally {
     btn.innerHTML = '<i class="fa fa-search"></i> RASTREAR';
