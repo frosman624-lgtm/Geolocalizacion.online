@@ -495,6 +495,7 @@ html,body{height:100%;overflow:hidden;background:#0a1208;color:var(--text);font-
 #map{flex:1;position:relative;}
 .leaflet-container{background:#0a1208 !important;filter:hue-rotate(80deg) saturate(0.7) brightness(0.88);}
 
+.leaflet-div-icon{background:none !important;border:none !important;}
 .leaflet-bar{
   background:var(--panel) !important;
   border:1px solid var(--border2) !important;
@@ -514,23 +515,45 @@ html,body{height:100%;overflow:hidden;background:#0a1208;color:var(--text);font-
 .leaflet-control-attribution{display:none;}
 
 .leaflet-popup-content-wrapper{
-  background:var(--panel2) !important;
-  border:1px solid rgba(74,222,128,0.25) !important;
+  background:rgba(7,12,7,0.97) !important;
+  border:1px solid rgba(74,222,128,0.35) !important;
+  border-top:2px solid var(--accent) !important;
   border-radius:0 !important;
   padding:0 !important;
-  box-shadow:0 0 30px rgba(74,222,128,0.12) !important;
+  box-shadow:0 0 30px rgba(74,222,128,0.2),0 4px 20px rgba(0,0,0,0.8) !important;
   color:var(--text) !important;
   font-family:var(--sans) !important;
+  backdrop-filter:blur(4px);
 }
 .leaflet-popup-content{
   margin:14px !important;
-  min-width:220px;
+  min-width:230px;
+  max-width:300px;
 }
 .leaflet-popup-tip-container{display:none;}
 .leaflet-popup-close-button{
-  color:var(--text2) !important;font-size:16px !important;
-  right:6px !important;top:4px !important;padding:0 !important;
+  color:var(--text2) !important;font-size:18px !important;
+  right:8px !important;top:6px !important;padding:0 !important;
+  line-height:1 !important;
 }
+.leaflet-popup-close-button:hover{color:var(--red) !important;}
+.leaflet-control-layers{
+  background:rgba(7,12,7,0.97) !important;
+  border:1px solid rgba(74,222,128,0.25) !important;
+  border-radius:0 !important;
+  padding:6px 10px !important;
+  box-shadow:0 0 20px rgba(0,0,0,0.6) !important;
+}
+.leaflet-control-layers-list{color:var(--text) !important;}
+.leaflet-control-layers label{
+  font-family:var(--mono) !important;
+  font-size:10px !important;
+  letter-spacing:1px !important;
+  color:var(--text) !important;
+  display:flex !important;align-items:center !important;gap:6px !important;
+  padding:3px 0 !important;
+}
+.leaflet-control-layers-separator{border-top:1px solid var(--border) !important;margin:4px 0 !important;}
 
 .popup-title{
   font-size:15px;font-weight:700;color:var(--white);
@@ -1120,24 +1143,40 @@ function initApp() {
 }
 
 function initMap() {
-  map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([-12.9, -73.5], 9);
+  map = L.map('map', { zoomControl: true, preferCanvas: true, maxZoom: 20 }).setView([-12.9, -73.5], 9);
 
+  // Capa oscura táctica
   const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', maxZoom: 19
+    subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 19
   });
 
+  // Satélite ESRI — mejor resolución disponible sin API key
   const satTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19
+    maxZoom: 20, maxNativeZoom: 19
   });
 
-  darkTile.addTo(map);
+  // Etiquetas de calles/lugares sobre satélite (Google-style hybrid)
+  const labelsOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 19, opacity: 0.9
+  });
+
+  // Satélite + etiquetas como capa combinada
+  const hybridLayer = L.layerGroup([satTile, labelsOverlay]);
+
+  // Por defecto: híbrido (satélite con nombres)
+  hybridLayer.addTo(map);
 
   const baseMaps = {
-    '<i class="fa fa-moon"></i> Oscuro': darkTile,
-    '<i class="fa fa-satellite"></i> Satélite': satTile
+    '<span style="font-family:monospace;font-size:11px">OSCURO</span>': darkTile,
+    '<span style="font-family:monospace;font-size:11px">SATÉLITE</span>': satTile,
+    '<span style="font-family:monospace;font-size:11px">HÍBRIDO</span>': hybridLayer
   };
 
-  L.control.layers(baseMaps, {}, { position: 'topright', collapsed: false }).addTo(map);
+  L.control.layers(baseMaps, {}, {
+    position: 'topright',
+    collapsed: false
+  }).addTo(map);
+
   L.control.scale({ metric: true, imperial: false, position: 'bottomright' }).addTo(map);
 }
 
@@ -1232,6 +1271,16 @@ function openPopup(obj, markerRef) {
     <div class="popup-row"><i class="fa fa-satellite-dish"></i>MÉTODO: ${metodo}</div>
     <div class="popup-row popup-ts"><i class="fa fa-clock"></i><b>${formatDate(obj.created_at)}</b></div>
     <div class="popup-coords"><i class="fa fa-crosshairs"></i> ${obj.lat}, ${obj.lon}</div>
+    <button onclick="map.flyTo([${obj.lat},${obj.lon}],19,{animate:true,duration:1.5})" style="
+      margin-top:8px;width:100%;
+      background:rgba(74,222,128,0.1);
+      border:1px solid rgba(74,222,128,0.3);
+      color:var(--accent);
+      font-family:var(--mono);font-size:9px;
+      letter-spacing:2px;padding:7px;
+      cursor:pointer;
+      display:flex;align-items:center;justify-content:center;gap:6px;
+    "><i class="fa fa-crosshairs"></i> IR A UBICACIÓN EXACTA</button>
   `;
   const m = markerRef || (markers[obj.id] && markers[obj.id].marker);
   if (m) {
