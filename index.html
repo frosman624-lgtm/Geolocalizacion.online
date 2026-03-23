@@ -9,8 +9,8 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 
-<link href="https://unpkg.com/maplibre-gl@4.1.3/dist/maplibre-gl.css" rel="stylesheet"/>
-<script src="https://unpkg.com/maplibre-gl@4.1.3/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
@@ -493,31 +493,44 @@ html,body{height:100%;overflow:hidden;background:#0a1208;color:var(--text);font-
 .add-msg.err{background:var(--red-dim);border-left:2px solid var(--red);color:#ff8080;}
 
 #map{flex:1;position:relative;}
-.maplibregl-canvas{filter:hue-rotate(80deg) saturate(0.7) brightness(0.85);}
+.leaflet-container{background:#0a1208 !important;filter:hue-rotate(80deg) saturate(0.7) brightness(0.88);}
 
-.maplibregl-ctrl-group{
+.leaflet-bar{
   background:var(--panel) !important;
   border:1px solid var(--border2) !important;
   border-radius:0 !important;
+  box-shadow:none !important;
 }
-.maplibregl-ctrl-group button{
-  background:transparent !important;
+.leaflet-bar a{
+  background:var(--panel) !important;
+  color:var(--accent) !important;
   border-bottom:1px solid var(--border) !important;
+  width:30px !important;height:30px !important;
+  line-height:30px !important;
+  font-size:16px !important;
 }
-.maplibregl-ctrl-group button:last-child{border:none !important;}
-.maplibregl-ctrl-icon{filter:invert(1) brightness(0.6);}
+.leaflet-bar a:hover{background:var(--accent-dim) !important;}
+.leaflet-bar a:last-child{border:none !important;}
+.leaflet-control-attribution{display:none;}
 
-.maplibregl-popup-content{
+.leaflet-popup-content-wrapper{
   background:var(--panel2) !important;
   border:1px solid rgba(74,222,128,0.25) !important;
   border-radius:0 !important;
-  padding:14px !important;
-  box-shadow:0 0 30px rgba(74,222,128,0.1) !important;
+  padding:0 !important;
+  box-shadow:0 0 30px rgba(74,222,128,0.12) !important;
   color:var(--text) !important;
   font-family:var(--sans) !important;
-  min-width:230px;
 }
-.maplibregl-popup-tip{display:none;}
+.leaflet-popup-content{
+  margin:14px !important;
+  min-width:220px;
+}
+.leaflet-popup-tip-container{display:none;}
+.leaflet-popup-close-button{
+  color:var(--text2) !important;font-size:16px !important;
+  right:6px !important;top:4px !important;padding:0 !important;
+}
 
 .popup-title{
   font-size:15px;font-weight:700;color:var(--white);
@@ -536,7 +549,6 @@ html,body{height:100%;overflow:hidden;background:#0a1208;color:var(--text);font-
   border-top:1px solid var(--border);
   font-family:var(--mono);font-size:9px;color:var(--accent);
 }
-.maplibregl-popup-close-button{color:var(--text2) !important;font-size:16px !important;right:6px !important;top:4px !important;}
 .popup-ts{color:var(--red) !important;}
 
 .bottombar{
@@ -564,6 +576,21 @@ html,body{height:100%;overflow:hidden;background:#0a1208;color:var(--text);font-
 }
 .toast.err{border-color:rgba(255,53,53,0.35);border-left-color:var(--red);color:#ff8080;}
 @keyframes slideUp{from{transform:translateY(12px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+.ip-result-card{
+  background:rgba(74,222,128,0.04);
+  border:1px solid rgba(74,222,128,0.2);
+  padding:12px;
+  margin-bottom:4px;
+}
+.ip-result-row{
+  font-family:var(--mono);font-size:10px;
+  color:var(--text);margin-bottom:6px;
+  display:flex;align-items:flex-start;gap:8px;
+}
+.ip-result-row i{color:var(--accent);width:12px;flex-shrink:0;margin-top:1px;}
+.ip-result-row span{color:var(--white);word-break:break-all;}
+
 body::after{
   content:'';
   position:fixed;inset:0;
@@ -652,6 +679,90 @@ body::after{
   `;
   document.head.appendChild(st);
 })();
+async function rastrearIP() {
+  const ip = document.getElementById('ipInput').value.trim();
+  const btn = document.getElementById('ipBtn');
+  const err = document.getElementById('ipErr');
+  const res = document.getElementById('ipResult');
+
+  if (!ip) { err.textContent = 'Ingresa una dirección IP.'; err.className='add-msg err'; return; }
+
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+  err.textContent = ''; res.style.display = 'none';
+
+  try {
+    const r = await fetch(`https://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,proxy,hosting,query&lang=es`);
+    const d = await r.json();
+
+    if (d.status !== 'success') {
+      err.textContent = 'IP no encontrada: ' + (d.message || 'error');
+      err.className = 'add-msg err';
+    } else {
+      ipData = d;
+      document.getElementById('ir_ip').textContent     = d.query;
+      document.getElementById('ir_pais').textContent   = d.country + ' (' + d.countryCode + ')';
+      document.getElementById('ir_ciudad').textContent = d.city + ', ' + d.regionName + (d.zip ? ' ' + d.zip : '');
+      document.getElementById('ir_isp').textContent    = d.isp + (d.org && d.org !== d.isp ? ' / ' + d.org : '');
+      document.getElementById('ir_coords').textContent = d.lat.toFixed(6) + ', ' + d.lon.toFixed(6);
+      document.getElementById('ir_tz').textContent     = d.timezone;
+      const tipo = [];
+      if (d.proxy)   tipo.push('PROXY');
+      if (d.hosting) tipo.push('HOSTING/VPN');
+      if (!d.proxy && !d.hosting) tipo.push('RESIDENCIAL');
+      document.getElementById('ir_tipo').textContent   = tipo.join(' · ');
+      res.style.display = 'block';
+      showToast('<i class="fa fa-wifi"></i> IP localizada: ' + d.city + ', ' + d.country);
+    }
+  } catch {
+    err.textContent = 'Error de conexión. Intenta con otra IP.';
+    err.className = 'add-msg err';
+  } finally {
+    btn.innerHTML = '<i class="fa fa-search"></i> RASTREAR';
+  }
+}
+
+function marcarIPEnMapa() {
+  if (!ipData) return;
+  if (ipMarker) { map.removeLayer(ipMarker.marker); ipMarker = null; }
+
+  const ipIcon = L.divIcon({
+    className: '',
+    html: `<div style="background:#facc15;color:#000;font-family:'Share Tech Mono',monospace;font-size:9px;font-weight:900;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.5);box-shadow:0 0 14px rgba(250,204,21,0.9);animation:markerPulse 1.8s ease-in-out infinite"><span style="transform:rotate(45deg)">IP</span></div>`,
+    iconSize: [26,26], iconAnchor: [13,26], popupAnchor: [0,-28]
+  });
+
+  const m = L.marker([ipData.lat, ipData.lon], { icon: ipIcon, zIndexOffset: 500 })
+    .addTo(map)
+    .bindPopup(`
+      <div class="popup-title"><i class="fa fa-wifi" style="color:#facc15;margin-right:6px"></i>IP: ${ipData.query}</div>
+      <div class="popup-row"><i class="fa fa-flag"></i><b>${ipData.country}</b></div>
+      <div class="popup-row"><i class="fa fa-city"></i><b>${ipData.city}, ${ipData.regionName}</b></div>
+      <div class="popup-row"><i class="fa fa-building"></i><b>${ipData.isp}</b></div>
+      <div class="popup-coords"><i class="fa fa-crosshairs"></i> ${ipData.lat}, ${ipData.lon}</div>
+    `, { maxWidth: 260, className: 'divitid-popup' })
+    .openPopup();
+
+  ipMarker = {marker: m};
+  map.flyTo([ipData.lat, ipData.lon], 15, { animate: true, duration: 1.5 });
+  if (window.innerWidth <= 767) closeSidebar();
+}
+
+function agregarIPComoObjetivo() {
+  if (!ipData) return;
+  switchTab('add');
+  document.getElementById('f_numero').value  = ipData.query;
+  document.getElementById('f_lat').value     = ipData.lat.toFixed(6);
+  document.getElementById('f_lon').value     = ipData.lon.toFixed(6);
+  document.getElementById('f_dpto').value    = ipData.regionName || '';
+  document.getElementById('f_dist').value    = ipData.city || '';
+  document.getElementById('f_ref').value     = ipData.isp + ' — ' + ipData.city + ', ' + ipData.country;
+  document.getElementById('f_metodo').value  = 'GPS';
+  const prev = document.getElementById('coordsPreview');
+  prev.textContent = 'IP: ' + ipData.query + ' | LAT: ' + ipData.lat + ' | LON: ' + ipData.lon;
+  prev.classList.add('show');
+  map.flyTo([ipData.lat, ipData.lon], 13, { animate: true, duration: 1 });
+}
+
 </script>
 </head>
 <body>
@@ -716,6 +827,7 @@ body::after{
       <div class="chip live">
         <i class="fa fa-circle blink"></i> EN VIVO
       </div>
+      <div class="chip" id="dateChip" style="display:none"></div>
       <div class="chip" id="clockChip">--:--:--</div>
       <button class="btn-icon" title="Cerrar sesión" onclick="doLogout()">
         <i class="fa fa-right-from-bracket"></i>
@@ -737,6 +849,9 @@ body::after{
         </button>
         <button class="sb-tab" id="tabAddBtn" onclick="switchTab('add')">
           <i class="fa fa-plus"></i> AGREGAR
+        </button>
+        <button class="sb-tab" id="tabIpBtn" onclick="switchTab('ip')">
+          <i class="fa fa-wifi"></i> IP
         </button>
       </div>
 
@@ -837,10 +952,78 @@ body::after{
           <div class="add-msg" id="addMsg"></div>
         </div>
       </div>
+
+      <div class="tab-pane" id="tabIp">
+        <div class="sb-head"><i class="fa fa-wifi"></i> RASTREO POR DIRECCIÓN IP</div>
+        <div class="add-form">
+          <div class="f-group">
+            <label><i class="fa fa-network-wired"></i> DIRECCIÓN IP OBJETIVO</label>
+            <div class="geocode-row">
+              <input class="geocode-input" type="text" id="ipInput" placeholder="Ej: 190.42.51.100" onkeydown="if(event.key==='Enter')rastrearIP()"/>
+              <button class="btn-geo" id="ipBtn" onclick="rastrearIP()"><i class="fa fa-search"></i> RASTREAR</button>
+            </div>
+          </div>
+          <div id="ipResult" style="display:none">
+            <div class="ip-result-card">
+              <div class="ip-result-row"><i class="fa fa-globe"></i><span id="ir_ip">—</span></div>
+              <div class="ip-result-row"><i class="fa fa-flag"></i><span id="ir_pais">—</span></div>
+              <div class="ip-result-row"><i class="fa fa-city"></i><span id="ir_ciudad">—</span></div>
+              <div class="ip-result-row"><i class="fa fa-building"></i><span id="ir_isp">—</span></div>
+              <div class="ip-result-row"><i class="fa fa-crosshairs"></i><span id="ir_coords">—</span></div>
+              <div class="ip-result-row"><i class="fa fa-clock"></i><span id="ir_tz">—</span></div>
+              <div class="ip-result-row"><i class="fa fa-shield-halved"></i><span id="ir_tipo">—</span></div>
+            </div>
+            <button class="btn-add" style="margin-top:10px" onclick="marcarIPEnMapa()">
+              <i class="fa fa-location-dot"></i> VER EN MAPA
+            </button>
+            <button class="btn-add" style="background:rgba(74,222,128,0.15);color:var(--accent);border:1px solid var(--accent);margin-top:6px" onclick="agregarIPComoObjetivo()">
+              <i class="fa fa-plus"></i> AGREGAR COMO OBJETIVO
+            </button>
+          </div>
+          <div id="ipErr" class="add-msg" style="margin-top:8px"></div>
+        </div>
+      </div>
     </aside>
 
     
-    <div id="map"></div>
+    <div id="map" style="position:relative">
+    <div id="mapLegend" style="
+      position:absolute;bottom:40px;left:14px;z-index:10;
+      background:rgba(7,11,7,0.95);
+      border:1px solid rgba(74,222,128,0.2);
+      padding:10px 14px;
+      font-family:'Share Tech Mono',monospace;
+      font-size:9px;
+      color:var(--text2);
+      min-width:160px;
+    ">
+      <div style="color:var(--accent);letter-spacing:2px;margin-bottom:8px;font-size:9px">
+        <i class="fa fa-circle-info" style="margin-right:6px"></i>LEYENDA
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#ff4040;flex-shrink:0"></div>
+        <span>Objetivo activo</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#4ade80;flex-shrink:0;box-shadow:0 0 6px rgba(74,222,128,0.8)"></div>
+        <span>Objetivo seleccionado</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="width:14px;height:3px;background:rgba(74,222,128,0.5);border-top:1px dashed #4ade80"></div>
+        <span>Conexión zona</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#facc15;flex-shrink:0"></div>
+        <span>IP rastreada</span>
+      </div>
+      <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(74,222,128,0.1)">
+        <div style="margin-bottom:3px"><span style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.2);color:#4ade80;padding:1px 4px">GPS</span> señal GPS</div>
+        <div style="margin-bottom:3px"><span style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.2);color:#4ade80;padding:1px 4px">CELL</span> torre celular</div>
+        <div style="margin-bottom:3px"><span style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.2);color:#4ade80;padding:1px 4px">E-CID</span> cell ID</div>
+        <div><span style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.2);color:#4ade80;padding:1px 4px">TA-RTT</span> timing advance</div>
+      </div>
+    </div>
+    </div>
   </div>
 
   
@@ -859,7 +1042,8 @@ const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'admin';
 
-let db, map, objetivos = [], markers = {}, popupRef = null, activeId = null;
+let db, map, objetivos = [], markers = {}, activeId = null;
+let ipMarker = null, ipData = null;
 let sidebarOpen = false;
 
 function togglePwd() {
@@ -904,10 +1088,15 @@ function doLogout() {
 }
 
 function startClock() {
-  const el = document.getElementById('clockChip');
+  const el   = document.getElementById('clockChip');
+  const elD  = document.getElementById('dateChip');
+  const days = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+  const mons = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
   function tick() {
-    const now = new Date();
-    el.textContent = now.toLocaleTimeString('es-PE', { hour12: false, timeZone: 'America/Lima' });
+    const now = new Date(new Date().toLocaleString('en-US',{timeZone:'America/Lima'}));
+    el.textContent = now.toLocaleTimeString('es-PE', { hour12: false });
+    elD.textContent = days[now.getDay()] + ' ' + String(now.getDate()).padStart(2,'0') + ' ' + mons[now.getMonth()] + ' ' + now.getFullYear();
+    elD.style.display = 'flex';
   }
   tick();
   setInterval(tick, 1000);
@@ -915,43 +1104,41 @@ function startClock() {
 
 function initApp() {
   startClock();
-  db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   initMap();
-  loadObjetivos();
-  subscribeRealtime();
+  const configured = SUPABASE_URL.indexOf('TUPROYECTO') === -1 && SUPABASE_KEY.indexOf('TU_ANON') === -1;
+  if (configured) {
+    try {
+      db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      loadObjetivos();
+      subscribeRealtime();
+    } catch(e) {
+      showToast('Error Supabase: ' + e.message, true);
+    }
+  } else {
+    showToast('<i class="fa fa-triangle-exclamation"></i> Configura SUPABASE_URL y SUPABASE_KEY en el archivo', true);
+  }
 }
 
 function initMap() {
-  map = new maplibregl.Map({
-    container: 'map',
-    style: {
-      version: 8,
-      sources: {
-        'carto-dark': {
-          type: 'raster',
-          tiles: [
-            'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-            'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-            'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
-          ],
-          tileSize: 256,
-          attribution: '© OpenStreetMap © CARTO'
-        }
-      },
-      layers: [{
-        id: 'background',
-        type: 'raster',
-        source: 'carto-dark',
-        paint: { 'raster-opacity': 1 }
-      }]
-    },
-    center: [-73.5, -12.9],
-    zoom: 9,
-    attributionControl: false
+  map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([-12.9, -73.5], 9);
+
+  const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd', maxZoom: 19
   });
 
-  map.addControl(new maplibregl.NavigationControl(), 'top-right');
-  map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
+  const satTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19
+  });
+
+  darkTile.addTo(map);
+
+  const baseMaps = {
+    '<i class="fa fa-moon"></i> Oscuro': darkTile,
+    '<i class="fa fa-satellite"></i> Satélite': satTile
+  };
+
+  L.control.layers(baseMaps, {}, { position: 'topright', collapsed: false }).addTo(map);
+  L.control.scale({ metric: true, imperial: false, position: 'bottomright' }).addTo(map);
 }
 
 async function loadObjetivos() {
@@ -986,77 +1173,53 @@ function subscribeRealtime() {
     .subscribe();
 }
 
-function makeMarkerEl(id, active) {
-  const el = document.createElement('div');
+function makeLeafletIcon(id, active) {
   const color = active ? '#4ade80' : '#ff4040';
   const glow  = active ? 'rgba(74,222,128,0.8)' : 'rgba(255,64,64,0.5)';
-  const pulse = active ? 'animation:markerPulse 1.8s ease-in-out infinite;' : '';
-  el.style.cssText = `
-    background:${color};color:#000;
-    font-family:'Share Tech Mono',monospace;
-    font-size:10px;font-weight:900;
-    width:26px;height:26px;
-    border-radius:50% 50% 50% 0;
-    transform:rotate(-45deg);
-    display:flex;align-items:center;justify-content:center;
-    border:2px solid rgba(255,255,255,0.5);
-    box-shadow:0 0 12px ${glow};
-    cursor:pointer;
-    ${pulse}
-  `;
-  const span = document.createElement('span');
-  span.style.transform = 'rotate(45deg)';
-  span.textContent = id > 99 ? '·' : id;
-  el.appendChild(span);
-  return el;
+  const anim  = active ? 'animation:markerPulse 1.8s ease-in-out infinite' : '';
+  const num   = id > 99 ? '·' : id;
+  return L.divIcon({
+    className: '',
+    html: `<div style="background:${color};color:#000;font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:900;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.5);box-shadow:0 0 12px ${glow};${anim}"><span style="transform:rotate(45deg)">${num}</span></div>`,
+    iconSize: [26,26],
+    iconAnchor: [13,26],
+    popupAnchor: [0,-28]
+  });
 }
 
 function addMarker(obj) {
-  const el = makeMarkerEl(obj.id, false);
-  const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-    .setLngLat([parseFloat(obj.lon), parseFloat(obj.lat)])
-    .addTo(map);
-
-  el.addEventListener('click', () => {
-    setActive(obj.id);
-    scrollToCard(obj.id);
-    openPopup(obj);
-    if (window.innerWidth <= 767) closeSidebar();
-  });
-
-  markers[obj.id] = { marker: m, el };
+  const icon = makeLeafletIcon(obj.id, false);
+  const m = L.marker([parseFloat(obj.lat), parseFloat(obj.lon)], { icon, zIndexOffset: 100 })
+    .addTo(map)
+    .on('click', () => {
+      map.flyTo([parseFloat(obj.lat), parseFloat(obj.lon)], 16, { animate: true, duration: 1.2 });
+      setActive(obj.id);
+      scrollToCard(obj.id);
+      openPopup(obj, m);
+      if (window.innerWidth <= 767) closeSidebar();
+    });
+  markers[obj.id] = { marker: m };
   return m;
 }
 
 function removeMarker(id) {
-  if (markers[id]) { markers[id].marker.remove(); delete markers[id]; }
+  if (markers[id]) { map.removeLayer(markers[id].marker); delete markers[id]; }
 }
 
 function setActive(id) {
   if (activeId && markers[activeId]) {
-    const prev = objetivos.find(o => o.id === activeId);
-    if (prev) {
-      const newEl = makeMarkerEl(activeId, false);
-      markers[activeId].marker.getElement().replaceWith(newEl);
-      newEl.addEventListener('click', () => { setActive(prev.id); scrollToCard(prev.id); openPopup(prev); });
-      markers[activeId].el = newEl;
-    }
+    markers[activeId].marker.setIcon(makeLeafletIcon(activeId, false));
   }
   activeId = id;
   if (markers[id]) {
-    const newEl = makeMarkerEl(id, true);
-    const obj = objetivos.find(o => o.id === id);
-    markers[id].marker.getElement().replaceWith(newEl);
-    newEl.addEventListener('click', () => { setActive(id); scrollToCard(id); openPopup(obj); });
-    markers[id].el = newEl;
+    markers[id].marker.setIcon(makeLeafletIcon(id, true));
   }
   document.querySelectorAll('.obj-card').forEach(c => c.classList.remove('active'));
   const card = document.getElementById('card-' + id);
   if (card) card.classList.add('active');
 }
 
-function openPopup(obj) {
-  if (popupRef) { popupRef.remove(); popupRef = null; }
+function openPopup(obj, markerRef) {
   const metodo = obj.metodo && obj.metodo !== '—'
     ? `<span style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:1px 5px;font-size:8px">${obj.metodo}</span>`
     : '—';
@@ -1070,14 +1233,14 @@ function openPopup(obj) {
     <div class="popup-row popup-ts"><i class="fa fa-clock"></i><b>${formatDate(obj.created_at)}</b></div>
     <div class="popup-coords"><i class="fa fa-crosshairs"></i> ${obj.lat}, ${obj.lon}</div>
   `;
-  popupRef = new maplibregl.Popup({ closeButton: true, maxWidth: '280px', offset: [0, -26] })
-    .setLngLat([parseFloat(obj.lon), parseFloat(obj.lat)])
-    .setHTML(html)
-    .addTo(map);
+  const m = markerRef || (markers[obj.id] && markers[obj.id].marker);
+  if (m) {
+    m.bindPopup(html, { maxWidth: 290, className: 'divitid-popup' }).openPopup();
+  }
 }
 
 function renderAll() {
-  Object.values(markers).forEach(m => m.marker.remove());
+  Object.values(markers).forEach(m => map.removeLayer(m.marker));
   markers = {};
   objetivos.forEach(obj => addMarker(obj));
   renderList();
@@ -1118,9 +1281,10 @@ function renderList() {
     `;
 
     card.addEventListener('click', () => {
-      map.flyTo({ center: [parseFloat(obj.lon), parseFloat(obj.lat)], zoom: 14, duration: 900 });
+      map.flyTo([parseFloat(obj.lat), parseFloat(obj.lon)], 16, { animate: true, duration: 1.2 });
       setActive(obj.id);
-      openPopup(obj);
+      scrollToCard(obj.id);
+      openPopup(obj, markers[obj.id] && markers[obj.id].marker);
       if (window.innerWidth <= 767) closeSidebar();
     });
 
@@ -1131,15 +1295,15 @@ function renderList() {
 function fitBounds() {
   if (!objetivos.length) return;
   if (objetivos.length === 1) {
-    map.flyTo({ center: [parseFloat(objetivos[0].lon), parseFloat(objetivos[0].lat)], zoom: 13 });
+    map.flyTo([parseFloat(objetivos[0].lat), parseFloat(objetivos[0].lon)], 13, { animate: true });
     return;
   }
   const lngs = objetivos.map(o => parseFloat(o.lon));
   const lats = objetivos.map(o => parseFloat(o.lat));
   map.fitBounds([
-    [Math.min(...lngs), Math.min(...lats)],
-    [Math.max(...lngs), Math.max(...lats)]
-  ], { padding: { top: 60, bottom: 60, left: 60, right: 60 }, duration: 1000 });
+    [Math.min(...lats), Math.min(...lngs)],
+    [Math.max(...lats), Math.max(...lngs)]
+  ], { padding: [60, 60] });
 }
 
 function scrollToCard(id) {
@@ -1181,7 +1345,7 @@ async function geocodeAddress() {
       prev.textContent = `LAT: ${r.lat} | LON: ${r.lon} — ${r.display_name.split(',').slice(0,2).join(',')}`;
       prev.classList.add('show');
 
-        map.flyTo({ center: [parseFloat(r.lon), parseFloat(r.lat)], zoom: 13, duration: 800 });
+        map.flyTo([parseFloat(r.lat), parseFloat(r.lon)], 13, { animate: true, duration: 1 });
     }
   } catch {
     showAddMsg('Error de conexión con el geocodificador.', 'err');
@@ -1207,6 +1371,7 @@ async function agregarObjetivo() {
     metodo: g('f_metodo') || '—'
   };
 
+  if (!db) { showAddMsg("Configura Supabase primero.", "err"); return; }
   const { error } = await db.from('objetivos').insert([payload]);
 
   if (error) {
@@ -1225,6 +1390,7 @@ async function eliminar(id) {
   const obj = objetivos.find(o => o.id === id);
   if (!obj) return;
   if (!confirm(`¿Eliminar objetivo ${obj.numero}?`)) return;
+  if (!db) return;
   const { error } = await db.from('objetivos').delete().eq('id', id);
   if (error) showToast('Error al eliminar: ' + error.message, true);
 }
@@ -1232,8 +1398,12 @@ async function eliminar(id) {
 function switchTab(tab) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sb-tab').forEach(b => b.classList.remove('active'));
-  document.getElementById(tab === 'list' ? 'tabList' : 'tabAdd').classList.add('active');
-  document.getElementById(tab === 'list' ? 'tabListBtn' : 'tabAddBtn').classList.add('active');
+  const paneMap = {list:'tabList', add:'tabAdd', ip:'tabIp'};
+  const btnMap  = {list:'tabListBtn', add:'tabAddBtn', ip:'tabIpBtn'};
+  const pane = document.getElementById(paneMap[tab]);
+  const btn  = document.getElementById(btnMap[tab]);
+  if(pane) pane.classList.add('active');
+  if(btn)  btn.classList.add('active');
 }
 
 function toggleSidebar() {
@@ -1277,6 +1447,90 @@ function formatDate(str) {
     });
   } catch { return str; }
 }
+async function rastrearIP() {
+  const ip = document.getElementById('ipInput').value.trim();
+  const btn = document.getElementById('ipBtn');
+  const err = document.getElementById('ipErr');
+  const res = document.getElementById('ipResult');
+
+  if (!ip) { err.textContent = 'Ingresa una dirección IP.'; err.className='add-msg err'; return; }
+
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+  err.textContent = ''; res.style.display = 'none';
+
+  try {
+    const r = await fetch(`https://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,proxy,hosting,query&lang=es`);
+    const d = await r.json();
+
+    if (d.status !== 'success') {
+      err.textContent = 'IP no encontrada: ' + (d.message || 'error');
+      err.className = 'add-msg err';
+    } else {
+      ipData = d;
+      document.getElementById('ir_ip').textContent     = d.query;
+      document.getElementById('ir_pais').textContent   = d.country + ' (' + d.countryCode + ')';
+      document.getElementById('ir_ciudad').textContent = d.city + ', ' + d.regionName + (d.zip ? ' ' + d.zip : '');
+      document.getElementById('ir_isp').textContent    = d.isp + (d.org && d.org !== d.isp ? ' / ' + d.org : '');
+      document.getElementById('ir_coords').textContent = d.lat.toFixed(6) + ', ' + d.lon.toFixed(6);
+      document.getElementById('ir_tz').textContent     = d.timezone;
+      const tipo = [];
+      if (d.proxy)   tipo.push('PROXY');
+      if (d.hosting) tipo.push('HOSTING/VPN');
+      if (!d.proxy && !d.hosting) tipo.push('RESIDENCIAL');
+      document.getElementById('ir_tipo').textContent   = tipo.join(' · ');
+      res.style.display = 'block';
+      showToast('<i class="fa fa-wifi"></i> IP localizada: ' + d.city + ', ' + d.country);
+    }
+  } catch {
+    err.textContent = 'Error de conexión. Intenta con otra IP.';
+    err.className = 'add-msg err';
+  } finally {
+    btn.innerHTML = '<i class="fa fa-search"></i> RASTREAR';
+  }
+}
+
+function marcarIPEnMapa() {
+  if (!ipData) return;
+  if (ipMarker) { map.removeLayer(ipMarker.marker); ipMarker = null; }
+
+  const ipIcon = L.divIcon({
+    className: '',
+    html: `<div style="background:#facc15;color:#000;font-family:'Share Tech Mono',monospace;font-size:9px;font-weight:900;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.5);box-shadow:0 0 14px rgba(250,204,21,0.9);animation:markerPulse 1.8s ease-in-out infinite"><span style="transform:rotate(45deg)">IP</span></div>`,
+    iconSize: [26,26], iconAnchor: [13,26], popupAnchor: [0,-28]
+  });
+
+  const m = L.marker([ipData.lat, ipData.lon], { icon: ipIcon, zIndexOffset: 500 })
+    .addTo(map)
+    .bindPopup(`
+      <div class="popup-title"><i class="fa fa-wifi" style="color:#facc15;margin-right:6px"></i>IP: ${ipData.query}</div>
+      <div class="popup-row"><i class="fa fa-flag"></i><b>${ipData.country}</b></div>
+      <div class="popup-row"><i class="fa fa-city"></i><b>${ipData.city}, ${ipData.regionName}</b></div>
+      <div class="popup-row"><i class="fa fa-building"></i><b>${ipData.isp}</b></div>
+      <div class="popup-coords"><i class="fa fa-crosshairs"></i> ${ipData.lat}, ${ipData.lon}</div>
+    `, { maxWidth: 260, className: 'divitid-popup' })
+    .openPopup();
+
+  ipMarker = {marker: m};
+  map.flyTo([ipData.lat, ipData.lon], 15, { animate: true, duration: 1.5 });
+  if (window.innerWidth <= 767) closeSidebar();
+}
+
+function agregarIPComoObjetivo() {
+  if (!ipData) return;
+  switchTab('add');
+  document.getElementById('f_numero').value  = ipData.query;
+  document.getElementById('f_lat').value     = ipData.lat.toFixed(6);
+  document.getElementById('f_lon').value     = ipData.lon.toFixed(6);
+  document.getElementById('f_dpto').value    = ipData.regionName || '';
+  document.getElementById('f_dist').value    = ipData.city || '';
+  document.getElementById('f_ref').value     = ipData.isp + ' — ' + ipData.city + ', ' + ipData.country;
+  document.getElementById('f_metodo').value  = 'GPS';
+  const prev = document.getElementById('coordsPreview');
+  prev.textContent = 'IP: ' + ipData.query + ' | LAT: ' + ipData.lat + ' | LON: ' + ipData.lon;
+  prev.classList.add('show');
+  map.flyTo([ipData.lat, ipData.lon], 13, { animate: true, duration: 1 });
+}
+
 </script>
 </body>
 </html>
