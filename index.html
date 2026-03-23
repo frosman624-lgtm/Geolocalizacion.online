@@ -1143,40 +1143,37 @@ function initApp() {
 }
 
 function initMap() {
-  map = L.map('map', { zoomControl: true, preferCanvas: true, maxZoom: 20 }).setView([-12.9, -73.5], 9);
+  map = L.map('map', { zoomControl: true, preferCanvas: true, maxZoom: 21 }).setView([-12.9, -73.5], 9);
 
-  // Capa oscura táctica
   const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 19
+    subdomains: 'abcd', maxZoom: 21, maxNativeZoom: 19
   });
 
-  // Satélite ESRI — mejor resolución disponible sin API key
-  const satTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 20, maxNativeZoom: 19
+  // Google Satellite — cobertura total, zoom hasta 21, sin API key
+  const gSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    subdomains: '0123', maxZoom: 21, maxNativeZoom: 20
   });
 
-  // Etiquetas de calles/lugares sobre satélite (Google-style hybrid)
-  const labelsOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 19, opacity: 0.9
+  // Google Hybrid — satélite + calles + nombres de lugares
+  const gHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+    subdomains: '0123', maxZoom: 21, maxNativeZoom: 20
   });
 
-  // Satélite + etiquetas como capa combinada
-  const hybridLayer = L.layerGroup([satTile, labelsOverlay]);
+  // Google Calles
+  const gStreet = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    subdomains: '0123', maxZoom: 21, maxNativeZoom: 20
+  });
 
-  // Por defecto: híbrido (satélite con nombres)
-  hybridLayer.addTo(map);
+  gHybrid.addTo(map);
 
   const baseMaps = {
-    '<span style="font-family:monospace;font-size:11px">OSCURO</span>': darkTile,
-    '<span style="font-family:monospace;font-size:11px">SATÉLITE</span>': satTile,
-    '<span style="font-family:monospace;font-size:11px">HÍBRIDO</span>': hybridLayer
+    '<span style="font-family:monospace;font-size:10px"><i class="fa fa-moon"></i> OSCURO</span>': darkTile,
+    '<span style="font-family:monospace;font-size:10px"><i class="fa fa-satellite"></i> SATÉLITE</span>': gSat,
+    '<span style="font-family:monospace;font-size:10px"><i class="fa fa-layer-group"></i> HÍBRIDO</span>': gHybrid,
+    '<span style="font-family:monospace;font-size:10px"><i class="fa fa-road"></i> CALLES</span>': gStreet
   };
 
-  L.control.layers(baseMaps, {}, {
-    position: 'topright',
-    collapsed: false
-  }).addTo(map);
-
+  L.control.layers(baseMaps, {}, { position: 'topright', collapsed: true }).addTo(map);
   L.control.scale({ metric: true, imperial: false, position: 'bottomright' }).addTo(map);
 }
 
@@ -1258,13 +1255,16 @@ function setActive(id) {
   if (card) card.classList.add('active');
 }
 
-function openPopup(obj, markerRef) {
+async function openPopup(obj, markerRef) {
   const metodo = obj.metodo && obj.metodo !== '—'
     ? `<span style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:1px 5px;font-size:8px">${obj.metodo}</span>`
     : '—';
-  const html = `
+
+  const ref = obj.ref && obj.ref.trim() ? obj.ref : null;
+
+  const buildPopup = (direccion) => `
     <div class="popup-title">OBJ-${String(obj.id).padStart(2,'0')} · ${obj.numero || ''}</div>
-    <div class="popup-row"><i class="fa fa-location-dot"></i><b>${obj.ref || '—'}</b></div>
+    <div class="popup-row"><i class="fa fa-location-dot"></i><b>${direccion}</b></div>
     <div class="popup-row"><i class="fa fa-map"></i>${obj.dpto || ''} › ${obj.prov || ''} › ${obj.dist || ''}</div>
     <div class="popup-row"><i class="fa fa-mobile-screen"></i>IMEI: <b>${obj.imei || '—'}</b></div>
     <div class="popup-row"><i class="fa fa-sim-card"></i>IMSI: <b>${obj.imsi || '—'}</b></div>
@@ -1282,9 +1282,25 @@ function openPopup(obj, markerRef) {
       display:flex;align-items:center;justify-content:center;gap:6px;
     "><i class="fa fa-crosshairs"></i> IR A UBICACIÓN EXACTA</button>
   `;
+
   const m = markerRef || (markers[obj.id] && markers[obj.id].marker);
-  if (m) {
-    m.bindPopup(html, { maxWidth: 290, className: 'divitid-popup' }).openPopup();
+  if (!m) return;
+
+  // Mostrar popup inmediato con lo que hay
+  m.bindPopup(buildPopup(ref || '<i>Obteniendo dirección...</i>'), { maxWidth: 300, className: 'divitid-popup' }).openPopup();
+
+  // Si no hay ref, buscar dirección exacta por coordenadas
+  if (!ref) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${obj.lat}&lon=${obj.lon}&format=json&accept-language=es`);
+      const d = await r.json();
+      if (d && d.display_name) {
+        const parts = d.display_name.split(',').slice(0,4).join(', ');
+        m.bindPopup(buildPopup(parts), { maxWidth: 300, className: 'divitid-popup' }).openPopup();
+      }
+    } catch(e) {
+      m.bindPopup(buildPopup(`${obj.lat}, ${obj.lon}`), { maxWidth: 300, className: 'divitid-popup' }).openPopup();
+    }
   }
 }
 
