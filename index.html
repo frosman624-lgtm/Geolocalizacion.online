@@ -13,6 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://js.hcaptcha.com/1/api.js" async defer></script>
 
 <style>
 
@@ -283,6 +284,10 @@ html,body{height:100%;overflow:hidden;background:#0a1208;color:var(--text);font-
 .auth-dot.ok{background:var(--accent);box-shadow:0 0 4px var(--accent);}
 .auth-dot.checking{background:var(--yellow);animation:blink 0.5s step-end infinite;}
 
+.h-captcha{
+  display:flex;justify-content:center;
+  filter:invert(0.05) hue-rotate(80deg);
+}
 .btn-login{
   width:100%;margin-top:4px;
   background:transparent;
@@ -977,6 +982,7 @@ function agregarIPComoObjetivo() {
           </button>
         </div>
       </div>
+      <div class="h-captcha" id="hCaptchaWidget" data-sitekey="5b70a2da-bb8c-4222-8c2a-50f469143e0a" data-theme="dark" data-callback="onCaptchaDone" data-expired-callback="onCaptchaExpired" style="margin-bottom:12px"></div>
       <button class="btn-login" id="loginBtn" onclick="doLogin()">
         <i class="fa fa-fingerprint"></i> AUTENTICAR ACCESO
       </button>
@@ -1244,6 +1250,19 @@ document.getElementById('loginUser').addEventListener('keydown', e => {
 });
 
 let loginAttempts = 0;
+let turnstileToken = null;
+
+function onCaptchaDone(token) {
+  turnstileToken = token;
+  const btn = document.getElementById('loginBtn');
+  if (btn) { btn.style.opacity = '1'; btn.disabled = false; }
+}
+
+function onCaptchaExpired() {
+  turnstileToken = null;
+  const btn = document.getElementById('loginBtn');
+  if (btn) { btn.style.opacity = '0.5'; btn.disabled = true; }
+}
 const MAX_ATTEMPTS = 5;
 let loginLocked = false;
 
@@ -1275,6 +1294,11 @@ function doLogin() {
 
   if (!user || !pass) {
     if(errMsg) errMsg.textContent = 'Completa todos los campos.';
+    err.classList.add('show'); return;
+  }
+
+  if (!turnstileToken) {
+    if(errMsg) errMsg.textContent = 'Completa la verificación de seguridad.';
     err.classList.add('show'); return;
   }
 
@@ -1323,6 +1347,7 @@ function doLogin() {
         }, 30000);
       }
       document.getElementById('loginPass').focus();
+      if (window.hcaptcha) { hcaptcha.reset(); turnstileToken = null; }
     }
   }, 800);
 }
